@@ -3,9 +3,9 @@
  * STATUS: not working, copy elision not forced for trivial copyable types.
  * Awaiting http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2025r1.html
  */
+#undef NDEBUG
 #include <iostream>
-#include <cstring>
-#include <assert.h>
+#include <cassert>
 
 #include "argparse/argparse.hpp"
 
@@ -80,6 +80,7 @@ void TEST_MULTI2() {
     }
 }
 
+#ifdef HAS_MAGIC_ENUM
 void TEST_ENUM() {
     enum Color {
         RED,
@@ -101,6 +102,7 @@ void TEST_ENUM() {
         assert(args.color3 == GREEN);
     }
 }
+#endif
 
 void TEST_ALL() {
     struct Args : public argparse::Args {
@@ -160,15 +162,42 @@ void TEST_ALL() {
     }
 }
 
+void TEST_THROW() {
+    struct Args : public argparse::Args {
+        std::string &A = arg("Source path");
+        int& k         = kwarg("k", "").set_default(0);   // Implicit value set to 3
+    };
+
+    {
+        std::string command = "argparse_test";
+        const auto &[argc, argv] = get_argc_argv(command);
+        try {
+            auto args = argparse::parse<Args>(argc, argv, true);
+        } catch (const std::runtime_error &e) {
+            assert(std::string(e.what()) ==  "Argument missing: arg_0 (Source path)");
+        }
+    }
+
+    {
+        std::string command = "argparse_test source_path -k=notanobumber";
+        const auto &[argc, argv] = get_argc_argv(command);
+        try {
+            auto args = argparse::parse<Args>(argc, argv, true);
+        } catch (const std::runtime_error &e) {
+            assert(std::string(e.what()) ==  "Invalid argument, could not convert \"notanobumber\" for -k ()");
+        }
+    }
+}
 
 int main(int argc, char* argv[]) {
     TEST_ALL();
     TEST_MULTI();
     TEST_MULTI2();
+    TEST_THROW();
 #ifdef HAS_MAGIC_ENUM
     TEST_ENUM();
 #else
-    std::cout << "Magic Enum not installed in this system, therefor native enum support disabled" << std::endl;
+    std::cout << "Magic Enum not installed in this system, therefore native enum support disabled" << std::endl;
 #endif
 
     return 0;
