@@ -122,7 +122,7 @@ namespace argparse {
         } else if constexpr (is_optional<T>::value) {
             return get<typename T::value_type>(v);
         } else if constexpr (std::is_enum<T>::value) {  // case-insensitive enum conversion
-#ifdef HAS_MAGIC_ENUM
+#if defined(HAS_MAGIC_ENUM) && defined(MAGIC_ENUM_SUPPORTED)
             constexpr auto& enum_entries = magic_enum::enum_entries<T>();
             const std::string lower_str = to_lower(v);
             for (const auto &[value, name] : enum_entries) {
@@ -134,8 +134,15 @@ namespace argparse {
                 error += (i==0? "" : ", ") + to_lower(enum_entries[i].second);
             error += "]";
             throw std::runtime_error(error);
-#else
+#elif !defined(HAS_MAGIC_ENUM)
             throw std::runtime_error("Enum not supported, please install magic_enum (https://github.com/Neargye/magic_enum)");
+#elif !defined(MAGIC_ENUM_SUPPORTED)
+
+            #pragma message("magic_enum unsupported compiler. Setting enums to default. See: https://github.com/Neargye/magic_enum#compiler-compatibility")
+
+            std::cout << "WARNING: magic_enum unsupported compiler. Setting " << typeid(T).name() << " = " << std::to_string(T()) << std::endl;
+            // return default enum value
+            return T();
 #endif
         } else {
             return T(v);
@@ -166,7 +173,7 @@ namespace argparse {
         [[nodiscard]] std::string get_allowed_entries() const override {
             std::stringstream ss;
 
-#ifdef HAS_MAGIC_ENUM
+#if defined(HAS_MAGIC_ENUM) && defined(MAGIC_ENUM_SUPPORTED)
             if constexpr (std::is_enum<T>::value) {
                 for (const auto &[value, name] : magic_enum::enum_entries<T>()) {
                     ss << to_lower(name) << ", ";
