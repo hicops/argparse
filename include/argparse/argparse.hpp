@@ -39,6 +39,37 @@
 #include <type_traits>         // for declval, false_type, true_type, is_enum
 #include <utility>             // for move, pair
 #include <vector>              // for vector
+#include <typeinfo>            // for type information
+
+#ifndef _MSC_VER
+#   include <cxxabi.h>
+#endif
+
+template <class T>
+std::string type_name()
+{
+    typedef typename std::remove_reference<T>::type TR;
+    std::unique_ptr<char, void(*)(void*)> own
+           (
+#ifndef _MSC_VER
+                abi::__cxa_demangle(typeid(TR).name(), nullptr,
+                                           nullptr, nullptr),
+#else
+                nullptr,
+#endif
+                std::free
+           );
+    std::string r = own != nullptr ? own.get() : typeid(TR).name();
+    if (std::is_const<TR>::value)
+        r += " const";
+    if (std::is_volatile<TR>::value)
+        r += " volatile";
+    if (std::is_lvalue_reference<T>::value)
+        r += "&";
+    else if (std::is_rvalue_reference<T>::value)
+        r += "&&";
+    return r;
+}
 
 #if __has_include("magic_enum.hpp")
 #include <magic_enum.hpp>      // for enum_entries
@@ -139,16 +170,21 @@ namespace argparse {
 #elif !defined(HAS_MAGIC_ENUM)
             throw std::runtime_error("Enum not supported, please install magic_enum (https://github.com/Neargye/magic_enum)");
 #elif !defined(MAGIC_ENUM_SUPPORTED)
-
+            // raise a compile warning
             #pragma message("magic_enum unsupported compiler. Setting enums to default. See: https://github.com/Neargye/magic_enum#compiler-compatibility")
 
-            std::cout << "WARNING: magic_enum unsupported compiler. Setting " << typeid(T).name() << " = " << std::to_string(T()) << std::endl;
-            // return default enum value
+            // generate a runtime warning
+            std::cout << "WARNING: magic_enum unavailable. Setting " << type_name<decltype(T())>() << " = " << std::to_string(T()) << " (default)" << std::endl;
+
+            // return enum with default value
             return T();
 #endif
         } else {
             return T(v);
         }
+
+        // to avoid compiler warnings. will never reach here
+        return T();
     }
 
     struct ConvertBase {
