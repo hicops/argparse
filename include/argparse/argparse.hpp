@@ -418,7 +418,7 @@ namespace argparse {
             program_name = argv[0];
             params = std::vector<std::string>(argv + 1, argv + argc);
 
-            bool& _help = flag("help", "print help");
+            bool& _help = flag("h,help", "print help");
 
             auto is_value = [&](const size_t &i) -> bool {
                 return params.size() > i && (params[i][0] != '-' || (params[i].size() > 1 && std::isdigit(params[i][1])));  // check for number to not accidentally mark negative numbers as non-parameter
